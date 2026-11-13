@@ -5,7 +5,6 @@ The package includes transformers for upgrading CSS syntax.
 ## Categories
 
 - [Widely Available](./src/widelyAvailable/): Transformers for features available in all major browsers for at least 30 months.
-- [Newly Available](./src/newlyAvailable/): Transformers for features available in all major browsers for 0-30 months.
 
 For a full list of transformations, see [README.md](./README.md).
 

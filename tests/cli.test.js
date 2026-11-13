@@ -54,6 +54,34 @@ describe("cssupgrade CLI", () => {
     assert.match(result.stdout, /All files are up to date/)
   })
 
+  test("print help", () => {
+    const result = runCli(["--help"])
+
+    assert.equal(result.status, 0)
+    assert.match(result.stdout, /Usage: cssupgrade/)
+  })
+
+  test("print the version", () => {
+    const result = runCli(["--version"])
+
+    assert.equal(result.status, 0)
+    assert.match(result.stdout.trim(), /^\d+\.\d+\.\d+$/)
+  })
+
+  test("reject a missing file argument", () => {
+    const result = runCli([])
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /missing required argument 'files'/)
+  })
+
+  test("reject an unknown option", () => {
+    const result = runCli(["--unknown"])
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /Unknown option '--unknown'/)
+  })
+
   test("print a diff without writing by default", async () => {
     const filePath = await writeFile(
       "nested.css",
