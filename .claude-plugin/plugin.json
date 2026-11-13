@@ -9,7 +9,7 @@
   },
   "homepage": "https://github.com/codingjoe/cssupgrade",
   "repository": "https://github.com/codingjoe/cssupgrade",
-  "license": "BSD-2-Clause",
+  "license": "AGPL-3.0-or-later",
   "keywords": [
     "css",
     "modernize",
