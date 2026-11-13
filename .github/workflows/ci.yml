@@ -30,7 +30,10 @@ jobs:
           node-version-file: package.json
       - run: npm ci
       - run: npx playwright install
+      - run: sudo safaridriver --enable
       - run: npm test
+        env:
+          SAFARI: "1"
       - uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
