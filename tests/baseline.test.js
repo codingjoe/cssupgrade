@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { suite, test } from "node:test"
+import * as newlyAvailable from "../src/newlyAvailable.js"
 import * as widelyAvailable from "../src/widelyAvailable.js"
 
 /**
@@ -19,7 +20,10 @@ const currentReleaseDate = new Date(Date.UTC(2026, 9, 1))
 suite("baseline", () => {
   // Dates can be found on https://github.com/web-platform-dx/web-features named `baseline_low_date`
   test("all transformers have a baselineDate", () => {
-    for (const [name, transformer] of Object.entries(widelyAvailable)) {
+    for (const [name, transformer] of Object.entries({
+      ...widelyAvailable,
+      ...newlyAvailable,
+    })) {
       assert(
         transformer.baselineDate instanceof Date,
         `${name} must have a baselineDate`,
@@ -32,6 +36,15 @@ suite("baseline", () => {
       assert(
         widelyAvailableAt(transformer.baselineDate) <= currentReleaseDate,
         `${name} (${transformer.baselineDate.toISOString().slice(0, 10)}) should be released for at least 30 months`,
+      )
+    }
+  })
+
+  test("newlyAvailable transformers are not yet widely available", () => {
+    for (const [name, transformer] of Object.entries(newlyAvailable)) {
+      assert(
+        widelyAvailableAt(transformer.baselineDate) > currentReleaseDate,
+        `${name} (${transformer.baselineDate.toISOString().slice(0, 10)}) should be moved to widelyAvailable`,
       )
     }
   })

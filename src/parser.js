@@ -13,31 +13,6 @@ import * as csstree from "css-tree"
  */
 
 /**
- * At-rules whose blocks contain style rules.
- */
-export const styleRuleAtRules = new Set([
-  "-moz-document",
-  "container",
-  "document",
-  "layer",
-  "media",
-  "scope",
-  "starting-style",
-  "supports",
-])
-
-/**
- * Check whether two selector nodes serialize identically.
- *
- * @param {import("css-tree").CssNode} left - First selector node.
- * @param {import("css-tree").CssNode} right - Second selector node.
- * @returns {boolean} True when both nodes are equal.
- */
-export function isEqualSelectorNode(left, right) {
-  return csstree.generate(left) === csstree.generate(right)
-}
-
-/**
  * Record the range of every comment in the source text.
  *
  * @param {SourceRange[]} comments - Collected comment ranges.
