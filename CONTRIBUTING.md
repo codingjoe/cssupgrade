@@ -4,7 +4,19 @@ To run tests locally, follow these steps:
 
 ```console
 npm ci
+npx playwright install
 npm test
+```
+
+The browser tests render every fixture with the original and transformed CSS and
+compare the computed styles of all elements in Chromium, Firefox, WebKit, and
+Safari. Register fixtures in the test file of the transformer they cover.
+
+Real Safari runs only on macOS with Remote Automation enabled:
+
+```console
+sudo safaridriver --enable
+npm run test:safari
 ```
 
 We use pre-commit hooks to lint and format code before committing.

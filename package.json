@@ -8,7 +8,8 @@
     "cssupgrade": "./bin/cssupgrade.js"
   },
   "scripts": {
-    "test": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=lcov.info --test-coverage-exclude=tests/**/* tests/*.test.js tests/**/*.test.js"
+    "test": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=lcov.info --test-coverage-exclude=tests/**/* tests/*.test.js tests/**/*.test.js",
+    "test:safari": "SAFARI=1 node --test --test-reporter=spec --test-name-pattern=\"computed styles safari\" tests/*.test.js tests/**/*.test.js"
   },
   "keywords": [
     "css",
@@ -32,5 +33,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/codingjoe/cssupgrade.git"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0",
+    "selenium-webdriver": "^4.51.0"
   }
 }
