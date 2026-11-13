@@ -13,6 +13,17 @@ import * as csstree from "css-tree"
  */
 
 /**
+ * Check whether two selector nodes serialize identically.
+ *
+ * @param {import("css-tree").CssNode} left - First selector node.
+ * @param {import("css-tree").CssNode} right - Second selector node.
+ * @returns {boolean} True when both nodes are equal.
+ */
+export function isEqualSelectorNode(left, right) {
+  return csstree.generate(left) === csstree.generate(right)
+}
+
+/**
  * Record the range of every comment in the source text.
  *
  * @param {SourceRange[]} comments - Collected comment ranges.
