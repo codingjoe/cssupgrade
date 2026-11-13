@@ -208,6 +208,7 @@ class SafariSession {
    */
   async readStyles(fixture, css) {
     await this.#driver.get("about:blank")
+    await this.#driver.actions().move({ x: 0, y: 0 }).perform()
     await this.#driver.executeScript(
       writeDocument,
       `<!doctype html><style>${css}</style>${fixture.html}`,
