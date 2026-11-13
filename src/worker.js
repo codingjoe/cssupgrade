@@ -4,20 +4,10 @@ import { transform } from "./index.js"
 
 /** Worker thread that transforms files on request. */
 
-/**
- * Convert an error into a plain object.
- *
- * @param {Error} error - Error thrown while transforming a file.
- * @returns {{name: string, message: string, stack: string | undefined}} Plain error data.
- */
-function serializeError({ name, message, stack }) {
-  return { name, message, stack }
-}
-
-parentPort.on("message", async ({ filePath, baseline, includeOriginal }) => {
+parentPort.on("message", async ({ filePath, includeOriginal }) => {
   try {
     const code = await fs.readFile(filePath, "utf8")
-    const result = transform(code, baseline)
+    const result = transform(code)
 
     parentPort.postMessage({
       success: true,
@@ -26,6 +16,9 @@ parentPort.on("message", async ({ filePath, baseline, includeOriginal }) => {
         : { modified: false },
     })
   } catch (error) {
-    parentPort.postMessage({ success: false, error: serializeError(error) })
+    parentPort.postMessage({
+      success: false,
+      error: { name: error.name, message: error.message, stack: error.stack },
+    })
   }
 })

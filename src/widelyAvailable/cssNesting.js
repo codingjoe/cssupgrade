@@ -1,19 +1,10 @@
 import { generate } from "css-tree"
-import { styleRuleAtRules } from "../atRules.js"
-import { parseCss } from "../parser.js"
+import { isEqualSelectorNode, parseCss, styleRuleAtRules } from "../parser.js"
 import { calculateSpecificity, isEqualSpecificity } from "../specificity.js"
 
-/**
- * @typedef {Object} TransformResult
- * @property {string} code - Transformed CSS source.
- * @property {boolean} modified - Whether the transformer changed the source.
- */
+/** @typedef {import("../index.js").TransformResult} TransformResult */
 
-/**
- * @typedef {Object} SourceRange
- * @property {number} start - Offset of the first character.
- * @property {number} end - Offset after the last character.
- */
+/** @typedef {import("../parser.js").SourceRange} SourceRange */
 
 /**
  * CSS whitespace characters.
@@ -32,17 +23,6 @@ function isPlainRule(rule) {
     rule.prelude.type === "SelectorList" &&
     [...rule.block.children].every((child) => child.type === "Declaration")
   )
-}
-
-/**
- * Check whether two selector nodes serialize identically.
- *
- * @param {import("css-tree").CssNode} left - First selector node.
- * @param {import("css-tree").CssNode} right - Second selector node.
- * @returns {boolean} True when both nodes are equal.
- */
-function isEqualSelectorNode(left, right) {
-  return generate(left) === generate(right)
 }
 
 /**

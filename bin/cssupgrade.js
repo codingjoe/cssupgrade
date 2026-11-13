@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 
-import { Command, Option } from "commander"
 import { diffLines } from "diff"
-import { once } from "events"
 import fs from "fs/promises"
 import process from "node:process"
+import { parseArgs } from "node:util"
 import pkg from "../package.json" with { type: "json" }
 import { transform } from "../src/index.js"
 import { WorkerPool } from "../src/pool.js"
@@ -17,7 +16,6 @@ import { WorkerPool } from "../src/pool.js"
  * Process a file using a worker thread.
  * @param {string} filePath - Path to the file to process.
  * @param {Object} options - Processing options.
- * @param {string} options.baseline - Baseline level for transformations.
  * @param {boolean} options.check - Whether to only check for changes.
  * @param {boolean} options.write - Whether to write changes to file.
  * @param {boolean} options.verbose - The verbosity level for logging.
@@ -42,7 +40,6 @@ async function processFile(filePath, options, worker) {
     const showsDiff = options.check || !options.write
     const workerResult = await worker.transform({
       filePath,
-      baseline: options.baseline,
       includeOriginal: showsDiff,
     })
 
@@ -108,7 +105,6 @@ function displayDiff(filePath, original, modified) {
 /**
  * Process stdin using the configured transformation options.
  * @param {Object} options - Processing options.
- * @param {string} options.baseline - Baseline level for transformations.
  * @param {boolean} options.check - Whether to only check for changes.
  * @param {boolean} options.write - Whether to write changes to file.
  * @param {boolean} options.verbose - The verbosity level for logging.
@@ -122,7 +118,7 @@ async function processStdin(options) {
 
   try {
     const code = await readStdin()
-    const result = transform(code, options.baseline)
+    const result = transform(code)
 
     if (options.check) {
       if (result.modified) {
@@ -145,31 +141,8 @@ async function processStdin(options) {
  */
 async function readStdin() {
   process.stdin.setEncoding("utf8")
-  let code = ""
 
-  process.stdin.on("data", (chunk) => {
-    code += chunk
-  })
-  await once(process.stdin, "end")
-  return code
-}
-
-/**
- * Identify a result that changed the file.
- * @param {{modified: boolean}} result - Result of processing one file.
- * @returns {boolean} True when the file changed.
- */
-function isModified({ modified }) {
-  return modified
-}
-
-/**
- * Identify a result that failed.
- * @param {{error: boolean}} result - Result of processing one file.
- * @returns {boolean} True when the file failed to process.
- */
-function isFailed({ error }) {
-  return error
+  return (await Array.fromAsync(process.stdin)).join("")
 }
 
 /**
@@ -220,15 +193,11 @@ class CLIRunner {
    * @returns {"files" | "stdin" | "mixed"} Selected input mode.
    */
   #getInputMode(patterns) {
-    const stdinCount = patterns.filter((pattern) => pattern === "-").length
-
-    switch (stdinCount) {
-      case 0:
+    switch (patterns.includes("-")) {
+      case false:
         return "files"
-      case 1:
-        return patterns.length === 1 ? "stdin" : "mixed"
       default:
-        return "mixed"
+        return patterns.length === 1 ? "stdin" : "mixed"
     }
   }
 
@@ -239,8 +208,8 @@ class CLIRunner {
    * @param {Object} options - Processing options.
    */
   #reportSummary(results, options) {
-    const modifiedCount = results.filter(isModified).length
-    const errorCount = results.filter(isFailed).length
+    const modifiedCount = results.filter(({ modified }) => modified).length
+    const errorCount = results.filter(({ error }) => error).length
 
     console.info("")
 
@@ -292,29 +261,71 @@ class CLIRunner {
   }
 }
 
-// Initialize CLI
-const program = new Command()
+const helpText = `Usage: cssupgrade [options] <files...>
+
+Auto-upgrade your CSS syntax
+
+Arguments:
+  files           Files or directories to process, or '-' to read from stdin
+
+Options:
+  --check         Report which files need upgrading and exit with code 1 if any do
+  --write         Write changes to files
+  --verbose, -v   Show more detailed output
+  --version, -V   Output the version number
+  --help, -h      Display help`
+
+/**
+ * Parse command-line arguments.
+ *
+ * @param {string[]} arguments_ - Arguments after the executable.
+ * @returns {{values: Object, positionals: string[]}} Parsed options and files.
+ */
+function parseCliArguments(arguments_) {
+  return parseArgs({
+    args: arguments_,
+    allowPositionals: true,
+    options: {
+      check: { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+      verbose: { type: "boolean", short: "v", default: false },
+      version: { type: "boolean", short: "V", default: false },
+      write: { type: "boolean", default: false },
+    },
+  })
+}
+
+/**
+ * Run the command-line interface.
+ *
+ * @param {string[]} arguments_ - Arguments after the executable.
+ * @returns {Promise<void>} Resolves when the run finishes.
+ */
+async function main(arguments_) {
+  try {
+    const { values: options, positionals: files } = parseCliArguments(arguments_)
+
+    switch (true) {
+      case options.help:
+        console.info(helpText)
+        break
+      case options.version:
+        console.info(pkg.version)
+        break
+      case files.length === 0:
+        console.error("error: missing required argument 'files'")
+        process.exitCode = 1
+        break
+      default:
+        await cliRunner.run(files, options)
+        break
+    }
+  } catch (error) {
+    console.error(`error: ${error.message}`)
+    process.exitCode = 1
+  }
+}
+
 const cliRunner = new CLIRunner(new URL("../src/worker.js", import.meta.url))
 
-program
-  .name("cssupgrade")
-  .description("Auto-upgrade your CSS syntax")
-  .version(pkg.version)
-  .argument("<files...>", "Files or directories to process, or '-' to read from stdin")
-  .addOption(
-    new Option("--baseline <level>", "Set baseline level for transformations")
-      .choices(["widely-available", "newly-available"])
-      .default("widely-available"),
-  )
-  .option("--verbose, -v", "Show more detailed output.", false)
-  .option(
-    "--check",
-    "Report which files need upgrading and exit with code 1 if any do",
-    false,
-  )
-  .option("--write", "Write changes to files", false)
-  .action(async (files, options) => {
-    await cliRunner.run(files, options)
-  })
-
-program.parse()
+await main(process.argv.slice(2))

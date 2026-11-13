@@ -62,14 +62,9 @@ export function isEqualSpecificity(left, right) {
  * @returns {Specificity} The larger value.
  */
 function maximumSpecificity(left, right) {
-  switch (true) {
-    case left[0] !== right[0]:
-      return left[0] > right[0] ? left : right
-    case left[1] !== right[1]:
-      return left[1] > right[1] ? left : right
-    default:
-      return left[2] >= right[2] ? left : right
-  }
+  const index = left.findIndex((value, position) => value !== right[position])
+
+  return index === -1 || left[index] > right[index] ? left : right
 }
 
 /**

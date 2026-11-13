@@ -1,5 +1,5 @@
 /**
- * Source text conditions that decide whether a transformer can match.
+ * Source text patterns that decide whether a transformer can match.
  *
  * Every transformer parses the whole source, which dominates the runtime of
  * this package. A transformer can only match when its pattern occurs in the
@@ -8,17 +8,17 @@
  */
 
 /**
- * Conditions a transformer needs in the source text. A transformer runs when all
- * of its conditions match. Each condition must be necessary: when the source
- * text fails a condition, the transformer cannot change the tree.
+ * Pattern a transformer needs in the source text. A transformer runs when its
+ * pattern matches. Each pattern must be necessary: when the source text does not
+ * match, the transformer cannot change the tree.
  *
- * @type {Map<string, RegExp[]>}
+ * @type {Map<string, RegExp>}
  */
 export const prefilters = new Map([
   // Nesting needs two rules, so the source holds at least two blocks.
-  ["cssNesting", [/\{[\s\S]*\{/]],
+  ["cssNesting", /\{[\s\S]*\{/],
   // Selector lists need a comma before a block.
-  ["isGrouping", [/,[\s\S]*\{/]],
+  ["isGrouping", /,[\s\S]*\{/],
 ])
 
 /**
@@ -27,5 +27,5 @@ export const prefilters = new Map([
  * @returns {boolean} True when the transformer needs to run
  */
 export function matchesPrefilter(name, code) {
-  return prefilters.get(name).every((condition) => condition.test(code))
+  return prefilters.get(name).test(code)
 }

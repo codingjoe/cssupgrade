@@ -32,11 +32,6 @@ import { transform } from "../src/index.js"
 const playwrightEngines = { chromium, firefox, webkit }
 
 /**
- * Baselines whose transformations must preserve the computed styles.
- */
-const baselines = ["widely-available", "newly-available"]
-
-/**
  * Read every computed property of every element and its pseudo-elements.
  *
  * Runs in the browser, so it must not reference the module scope.
@@ -241,23 +236,18 @@ class SafariSession {
  * @returns {Promise<void>} Resolves when the styles match.
  */
 async function verifyComputedStyles(session, fixture) {
-  const transformed = baselines
-    .map((baseline) => ({ baseline, ...transform(fixture.css, baseline) }))
-    .filter(({ modified }) => modified)
+  const transformed = transform(fixture.css)
 
-  assert(transformed.length > 0, "must transform the fixture")
+  assert(transformed.modified, "must transform the fixture")
 
   const before = await session.readStyles(fixture, fixture.css)
+  const after = await session.readStyles(fixture, transformed.code)
 
-  for (const { baseline, code } of transformed) {
-    const after = await session.readStyles(fixture, code)
-
-    assert.deepEqual(
-      calculateDifferences(before, after),
-      [],
-      `differs with the ${baseline} baseline`,
-    )
-  }
+  assert.deepEqual(
+    calculateDifferences(before, after),
+    [],
+    "differs after transformation",
+  )
 }
 
 /**
@@ -300,8 +290,8 @@ function describeBrowser(name, launch, fixtures) {
  * Compare the computed styles of every fixture before and after the transformation.
  *
  * Call inside the `describe` block of a transformer. The tests run in Chromium,
- * Firefox, WebKit, and Safari for every baseline that changes the fixture source.
- * Safari runs only when `SAFARI=1` is set.
+ * Firefox, WebKit, and Safari for every fixture that changes. Safari runs only
+ * when `SAFARI=1` is set.
  *
  * @param {ComputedStyleFixture[]} fixtures - Stylesheets and markup to test.
  * @returns {void}
