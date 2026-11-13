@@ -1,3 +1,4 @@
+import { generate } from "css-tree"
 import { parseCss } from "../parser.js"
 
 /**
@@ -40,12 +41,15 @@ const selectorListPseudoClasses = new Set([
   "-webkit-any",
   "any",
   "has",
-  "host",
-  "host-context",
   "is",
   "matches",
   "not",
 ])
+
+/**
+ * Pseudo-classes whose specificity is a pseudo-class plus their argument.
+ */
+const hostPseudoClasses = new Set(["host", "host-context"])
 
 /**
  * Pseudo-classes that select the nth element and accept an optional selector list.
@@ -58,19 +62,9 @@ const nthPseudoClasses = new Set(["nth-child", "nth-last-child"])
 const plainFunctionalPseudoClasses = new Set(["dir", "lang", "state"])
 
 /**
- * Text that can follow a parent selector when a child selector extends it.
+ * CSS whitespace characters.
  */
-const selectorContinuationPattern = /^[\s>+~.#:[]/
-
-/**
- * Relative combinator at the start of a nested selector.
- */
-const relativeCombinatorPattern = /^[>+~]/
-
-/**
- * Leading whitespace of the first selector in a nested selector.
- */
-const leadingWhitespacePattern = /^\s/
+const cssWhitespaceCharacters = new Set([" ", "\t", "\n", "\r", "\f"])
 
 /**
  * Add two specificity values.
@@ -200,6 +194,16 @@ function calculatePseudoClassSpecificity(node) {
       return [0, 1, 0]
     case selectorListPseudoClasses.has(name):
       return calculateSelectorArgumentSpecificity(node)
+    case hostPseudoClasses.has(name): {
+      const argumentSpecificity = calculateSelectorArgumentSpecificity(node)
+
+      switch (argumentSpecificity) {
+        case null:
+          return null
+        default:
+          return addSpecificity([0, 1, 0], argumentSpecificity)
+      }
+    }
     case nthPseudoClasses.has(name): {
       const argumentSpecificity = calculateNthSelectorSpecificity(node)
 
@@ -286,16 +290,14 @@ function isPlainRule(rule) {
 }
 
 /**
- * Read the source text of every selector in a rule.
+ * Check whether two selector nodes serialize identically.
  *
- * @param {string} code - CSS source text.
- * @param {import("css-tree").CssNode} rule - Style rule.
- * @returns {string[]} Selector texts.
+ * @param {import("css-tree").CssNode} left - First selector node.
+ * @param {import("css-tree").CssNode} right - Second selector node.
+ * @returns {boolean} True when both nodes are equal.
  */
-function extractSelectorTexts(code, rule) {
-  return Array.from(rule.prelude.children, (selector) =>
-    code.slice(selector.loc.start.offset, selector.loc.end.offset).trim(),
-  )
+function isEqualSelectorNode(left, right) {
+  return generate(left) === generate(right)
 }
 
 /**
@@ -332,47 +334,146 @@ function hasCommentOutsideBlock(comments, rule) {
 }
 
 /**
- * Match a parent selector against the start of a child selector.
+ * Describe the remainder of a child selector that starts with a combinator.
  *
- * @param {string} parentSelector - Parent selector text.
- * @param {string} childSelector - Child selector text.
- * @returns {string | null} Remaining child selector text, or null without a match.
+ * @param {string} code - CSS source text.
+ * @param {import("css-tree").CssNode} childSelector - Child selector.
+ * @param {import("css-tree").CssNode} combinator - Combinator node.
+ * @param {import("css-tree").CssNode} next - First node after the combinator.
+ * @returns {{kind: string, text: string}} Child selector remainder.
  */
-function matchSelectorPrefix(parentSelector, childSelector) {
-  switch (true) {
-    case !childSelector.startsWith(parentSelector):
-      return null
-    default: {
-      const remainder = childSelector.slice(parentSelector.length)
+function describeCombinatorRemainder(code, childSelector, combinator, next) {
+  switch (combinator.name.trim()) {
+    case "":
+      return {
+        kind: "descendant",
+        text: code.slice(next.loc.start.offset, childSelector.loc.end.offset),
+      }
+    default:
+      return {
+        kind: "relative",
+        text: code.slice(combinator.loc.start.offset, childSelector.loc.end.offset),
+      }
+  }
+}
 
-      switch (true) {
-        case remainder.trim() === "":
-          return null
-        case !selectorContinuationPattern.test(remainder):
+/**
+ * Describe the remainder of a child selector after a parent selector.
+ *
+ * @param {string} code - CSS source text.
+ * @param {import("css-tree").CssNode} childSelector - Child selector.
+ * @param {import("css-tree").CssNode[]} childNodes - Child selector nodes.
+ * @param {number} index - Index of the first node after the parent selector.
+ * @returns {{kind: string, text: string} | null} Remainder, or null when incomplete.
+ */
+function describeSelectorRemainder(code, childSelector, childNodes, index) {
+  const boundary = childNodes[index]
+
+  switch (boundary.type) {
+    case "Combinator": {
+      const next = childNodes[index + 1]
+
+      switch (next === undefined) {
+        case true:
           return null
         default:
-          return remainder
+          return describeCombinatorRemainder(code, childSelector, boundary, next)
       }
     }
+    default:
+      return {
+        kind: "compound",
+        text: code.slice(boundary.loc.start.offset, childSelector.loc.end.offset),
+      }
+  }
+}
+
+/**
+ * Match a parent selector against the start of a child selector.
+ *
+ * @param {string} code - CSS source text.
+ * @param {import("css-tree").CssNode} parentSelector - Parent selector.
+ * @param {import("css-tree").CssNode} childSelector - Child selector.
+ * @returns {{kind: string, text: string} | null} Remainder, or null without a match.
+ */
+function matchSelectorPrefix(code, parentSelector, childSelector) {
+  const parentNodes = [...parentSelector.children]
+  const childNodes = [...childSelector.children]
+
+  switch (true) {
+    case parentNodes.length >= childNodes.length:
+      return null
+    case !parentNodes.every((node, index) =>
+      isEqualSelectorNode(node, childNodes[index]),
+    ):
+      return null
+    default:
+      return describeSelectorRemainder(
+        code,
+        childSelector,
+        childNodes,
+        parentNodes.length,
+      )
   }
 }
 
 /**
  * Render the remainder of a child selector as a nested selector.
  *
- * @param {string} remainder - Child selector text after the parent selector.
+ * @param {{kind: string, text: string}} remainder - Child selector remainder.
  * @returns {string} Nested selector.
  */
 function renderNestedSelector(remainder) {
-  const text = remainder.trim()
+  switch (remainder.kind) {
+    case "descendant":
+      return remainder.text
+    case "relative":
+      return `& ${remainder.text}`
+    default:
+      return `&${remainder.text}`
+  }
+}
 
+/**
+ * Count the backslashes that end a string.
+ *
+ * @param {string} text - CSS source text.
+ * @returns {number} Number of trailing backslashes.
+ */
+function countTrailingBackslashes(text) {
+  switch (text.endsWith("\\")) {
+    case true:
+      return countTrailingBackslashes(text.slice(0, -1)) + 1
+    default:
+      return 0
+  }
+}
+
+/**
+ * Check whether a character is escaped by a preceding backslash.
+ *
+ * @param {string} text - CSS source text.
+ * @param {number} index - Index of the character to inspect.
+ * @returns {boolean} True when the character is escaped.
+ */
+function isEscapedCharacter(text, index) {
+  return countTrailingBackslashes(text.slice(0, index)) % 2 === 1
+}
+
+/**
+ * Remove trailing whitespace that is not part of an escape.
+ *
+ * @param {string} text - Declaration source text.
+ * @returns {string} Text without insignificant trailing whitespace.
+ */
+function trimDeclarationText(text) {
   switch (true) {
-    case relativeCombinatorPattern.test(text):
-      return `& ${text}`
-    case leadingWhitespacePattern.test(remainder):
+    case !cssWhitespaceCharacters.has(text.at(-1)):
+      return text
+    case isEscapedCharacter(text, text.length - 1):
       return text
     default:
-      return `&${text}`
+      return trimDeclarationText(text.slice(0, -1))
   }
 }
 
@@ -397,13 +498,15 @@ function findNestedPrelude(code, parent, child, comments) {
       break
   }
 
-  const parentSelectors = extractSelectorTexts(code, parent)
-  const childSelectors = extractSelectorTexts(code, child)
+  const parentSelectors = [...parent.prelude.children]
+  const childSelectors = [...child.prelude.children]
 
   switch (true) {
-    case new Set(parentSelectors).size !== parentSelectors.length:
+    case new Set(parentSelectors.map((selector) => generate(selector))).size !==
+      parentSelectors.length:
       return null
-    case new Set(childSelectors).size !== childSelectors.length:
+    case new Set(childSelectors.map((selector) => generate(selector))).size !==
+      childSelectors.length:
       return null
     default:
       break
@@ -423,11 +526,10 @@ function findNestedPrelude(code, parent, child, comments) {
   }
 
   const matches = childSelectors.map((selector) => ({
-    selector,
     parents: parentSelectors
       .map((parentSelector) => ({
         parentSelector,
-        remainder: matchSelectorPrefix(parentSelector, selector),
+        remainder: matchSelectorPrefix(code, parentSelector, selector),
       }))
       .filter(({ remainder }) => remainder !== null),
   }))
@@ -443,7 +545,7 @@ function findNestedPrelude(code, parent, child, comments) {
     parentSelector,
     remainders: matches
       .filter(({ parents }) => parents[0].parentSelector === parentSelector)
-      .map(({ parents }) => parents[0].remainder),
+      .map(({ parents }) => renderNestedSelector(parents[0].remainder)),
   }))
   const remainders = suffixes[0].remainders
 
@@ -451,13 +553,11 @@ function findNestedPrelude(code, parent, child, comments) {
     case suffixes.some(
       ({ remainders: candidate }) =>
         candidate.length !== remainders.length ||
-        candidate.some(
-          (remainder, index) => remainder.trim() !== remainders[index].trim(),
-        ),
+        candidate.some((remainder, index) => remainder !== remainders[index]),
     ):
       return null
     default:
-      return remainders.map(renderNestedSelector).join(", ")
+      return remainders.join(", ")
   }
 }
 
@@ -575,7 +675,10 @@ class NestingModernizer {
       case true: {
         const group = {
           node: child,
-          prelude: extractSelectorTexts(this.#code, child).join(", "),
+          prelude: this.#code.slice(
+            child.prelude.loc.start.offset,
+            child.prelude.loc.end.offset,
+          ),
           children: [],
           leadingComments: [],
         }
@@ -763,9 +866,9 @@ class NestingModernizer {
    * @returns {string} Declaration text.
    */
   #declarationText(declaration) {
-    return `${this.#code
-      .slice(declaration.loc.start.offset, declaration.loc.end.offset)
-      .trim()};`
+    return `${trimDeclarationText(
+      this.#code.slice(declaration.loc.start.offset, declaration.loc.end.offset),
+    )};`
   }
 
   /**

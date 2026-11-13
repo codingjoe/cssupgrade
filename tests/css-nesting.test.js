@@ -823,6 +823,140 @@ describe("cssNesting host selectors", () => {
 }`,
     )
   })
+
+  test("leave :host with a different specificity unchanged", () => {
+    const input = `:host(.a), .b { color: red; }
+:host(.a) .c, .b .c { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave :host-context with a different specificity unchanged", () => {
+    const input = `:host-context(.a), .b { color: red; }
+:host-context(.a) .c, .b .c { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave :host with an unknown selector argument unchanged", () => {
+    const input = `:host(:foo(.a)) { color: red; }
+:host(:foo(.a)) .c { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+})
+
+describe("cssNesting escaped selectors", () => {
+  test("leave a hex escape that consumes whitespace unchanged", () => {
+    const input = String.raw`.\31 { color: red; }
+.\31 23 { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave a class name that continues a hex escape unchanged", () => {
+    const input = String.raw`.m-1\31 { color: red; }
+.m-1\31 0 { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("nest a compound selector with an escaped space", () => {
+    assertTransform(
+      String.raw`.a\  { color: red; }
+.a\ .b { color: blue; }`,
+      String.raw`.a\  {
+  color: red;
+  &.b {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest a parent list with escaped spaces", () => {
+    assertTransform(
+      String.raw`.a\ , .b { color: red; }
+.a\  .c, .b .c { color: blue; }`,
+      String.raw`.a\ , .b {
+  color: red;
+  .c {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest a parent with a non-breaking space in its selector", () => {
+    assertTransform(
+      ".a\u00A0 { color: red; }\n.a\u00A0 .b { color: blue; }",
+      ".a\u00A0 {\n  color: red;\n  .b {\n    color: blue;\n  }\n}",
+    )
+  })
+
+  test("leave a child joined by a non-breaking space unchanged", () => {
+    const input = ".a { color: red; }\n.a\u00A0.b { color: blue; }"
+
+    assert.equal(transform(input).modified, false)
+  })
+})
+
+describe("cssNesting escaped declarations", () => {
+  test("preserve a declaration with a trailing escaped space", () => {
+    assertTransform(
+      String.raw`.a { --x: \ }
+.a .b { color: blue; }`,
+      String.raw`.a {
+  --x: \ ;
+  .b {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("preserve declarations after a trailing escaped space", () => {
+    assertTransform(
+      String.raw`.a { --x: \ ; color: red; }
+.a .b { color: blue; }`,
+      String.raw`.a {
+  --x: \ ;
+  color: red;
+  .b {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("trim whitespace after an escaped backslash", () => {
+    assertTransform(
+      String.raw`.a { --x: \\ }
+.a .b { color: blue; }`,
+      String.raw`.a {
+  --x: \\;
+  .b {
+    color: blue;
+  }
+}`,
+    )
+  })
+})
+
+describe("cssNesting selector boundaries", () => {
+  test("leave a child with a trailing combinator unchanged", () => {
+    const input = `.a { color: red; }
+.a > { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave a shorter child selector unchanged", () => {
+    const input = `.a .b { color: red; }
+.a { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
 })
 
 describe("cssNesting line endings", () => {
