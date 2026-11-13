@@ -1,0 +1,32 @@
+YOUR PRIORITY IS TO ENSURE THE SAFETY OF ALL TRANSFORMATIONS.
+
+When writing code, you MUST ALWAYS follow the [naming guidelines](https://raw.githubusercontent.com/codingjoe/naming-things/refs/heads/main/README.md).
+
+Usage:
+
+```console
+curl -sL https://raw.githubusercontent.com/codingjoe/naming-things/refs/heads/main/README.md | head -n 500
+```
+
+All code must be fully tested with a 100% coverage. Unreachable code must be removed.
+Follow the [CONTRIBUTING.md](./CONTRIBUTING.md) guidelines for testing and linting.
+
+All transformers must be documented in the README.md.
+
+Use class syntax for all object-oriented code.
+Use named functions instead of anonymous functions whenever possible.
+Use `#` for private methods.
+
+Avoid overly complex functions. Break them into smaller functions if necessary.
+
+Write docstrings with jsdoc type annotations for all functions, classes, and methods.
+Docstrings should be written in present tense imperative mood.
+They must start with a capital letter and end with a period.
+Docstrings must describe the external behavior of the function, class, or method.
+Docstrings should avoid redundant phrases like "This function" or "This method".
+Class docstrings must not repeat the class name or start with a verb since they don't do anything themselves.
+Avoid code comments unless they describe behavior of 3rd party code or complex algorithms.
+Avoid loops in favor of recursive functions or generator functions.
+Avoid functions or other code inside functions.
+Avoid if-statements in favor of switch-statements or polymorphism.
+Do not assign names to objects which are returned in the next line.

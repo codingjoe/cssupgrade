@@ -1,0 +1,36 @@
+{
+  "name": "cssupgrade",
+  "version": "0.1.0",
+  "description": "Auto-upgrade your CSS syntax",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "cssupgrade": "./bin/cssupgrade.js"
+  },
+  "scripts": {
+    "test": "node --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=lcov.info --test-coverage-exclude=tests/**/* tests/*.test.js tests/**/*.test.js"
+  },
+  "keywords": [
+    "css",
+    "modernize",
+    "upgrade",
+    "codemod",
+    "ast",
+    "transform",
+    "nesting"
+  ],
+  "author": "Johannes Maron",
+  "license": "BSD-2-Clause",
+  "dependencies": {
+    "commander": ">=14.0.2",
+    "css-tree": "^3.2.1",
+    "diff": ">=8.0.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codingjoe/cssupgrade.git"
+  }
+}

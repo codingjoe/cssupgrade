@@ -1,0 +1,8 @@
+- id: cssupgrade
+  name: CSSupgrade
+  description: 'Upgrade your CSS syntax to Baseline.'
+  entry: cssupgrade
+  args: [--check, --write]
+  language: node
+  types_or: [css]
+  require_serial: true

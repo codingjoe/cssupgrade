@@ -1,0 +1,35 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  readme:
+    name: "Word Weasel / README.md"
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - uses: actions/checkout@v7
+      - id: read_readme
+        run: |
+          echo "::set-output name=content::$(cat README.md)"
+      - uses: codingjoe/word-weasel@v1
+        with:
+          text: ${{ steps.read_readme.outputs.content }}
+  node-test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+      - run: npm ci
+      - run: npm test
+      - uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: css
+          files: lcov.info

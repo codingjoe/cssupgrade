@@ -1,0 +1,52 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-yaml
+      - id: destroyed-symlinks
+      - id: check-executables-have-shebangs
+      - id: end-of-file-fixer
+      - id: no-commit-to-branch
+        args: [--branch, main]
+      - id: detect-private-key
+  - repo: https://github.com/hukkin/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-config
+          - mdformat-footnote
+          - mdformat-gfm
+          - mdformat-gfm-alerts
+          - mdformat-frontmatter
+        args: [--number]
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/btford/write-good
+    rev: v1.0.8
+    hooks:
+      - id: write-good
+        args: [--no-passive]
+  - repo: https://github.com/oxc-project/mirrors-oxlint
+    rev: v1.60.0
+    hooks:
+      - id: oxlint
+  - repo: https://github.com/oxc-project/mirrors-oxfmt
+    rev: v0.78.0
+    hooks:
+      - id: oxfmt
+  - repo: https://github.com/codingjoe/esupgrade
+    rev: 2026.1.2 # Use the latest release
+    hooks:
+      - id: esupgrade
+ci:
+  autoupdate_schedule: weekly
+  skip:
+    - no-commit-to-branch
+    - write-good
+    - esupgrade
