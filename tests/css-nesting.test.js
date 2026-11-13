@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 import { transform } from "../src/index.js"
+import { testComputedStyles } from "./computedStyles.js"
+import { cssNestingFixtures } from "./fixtures/cssNesting.js"
 
 /**
  * Assert that a transformation produces the expected source text.
@@ -510,6 +512,8 @@ describe("cssNesting", () => {
 
     assert.equal(transform(input).modified, false)
   })
+
+  testComputedStyles(cssNestingFixtures)
 })
 
 describe("cssNesting edge cases", () => {

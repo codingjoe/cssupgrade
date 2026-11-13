@@ -21,7 +21,10 @@ jobs:
           text: ${{ steps.read_readme.outputs.content }}
   node-test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - name: Set up Node.js
@@ -29,9 +32,13 @@ jobs:
         with:
           node-version-file: package.json
       - run: npm ci
+      - run: npx playwright install
+      - run: sudo safaridriver --enable
       - run: npm test
+        env:
+          SAFARI: "1"
       - uses: codecov/codecov-action@v7
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           flags: css
           files: lcov.info
