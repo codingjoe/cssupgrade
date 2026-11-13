@@ -10,6 +10,16 @@ describe("transform", () => {
     assert.equal(result.code, ".a {\n  color: red;\n}\n\n.b {\n  color: blue;\n}\n")
   })
 
+  test("nest rules with the newly available baseline", () => {
+    const result = transform(
+      ".a { color: red } .a .b { color: blue }",
+      "newly-available",
+    )
+
+    assert.equal(result.modified, true)
+    assert.equal(result.code, ".a {\n  color: red;\n  .b {\n    color: blue;\n  }\n}")
+  })
+
   test("produce a stable result on a second pass", () => {
     const first = transform(".a { color: red } .a .b { color: blue }")
     const second = transform(first.code)

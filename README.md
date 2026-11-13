@@ -86,7 +86,13 @@ The skill will analyze your selected styles and suggest transformations based on
 
 All transformations are based on [Web Platform Baseline][baseline] features. Baseline tracks which web platform features are safe to use across browsers.
 
-CSSupgrade uses **widely available** features, meaning they work in all major browsers (Chrome, Edge, Safari, Firefox) for at least 30 months. This ensures full compatibility while keeping your styles modern.
+By default, CSSupgrade uses **widely available** features, meaning they work in all major browsers (Chrome, Edge, Safari, Firefox) for at least 30 months. This ensures full compatibility while keeping your styles modern.
+
+You can opt into **newly available** features (available in all browsers for 0-30 months) with:
+
+```bash
+npx cssupgrade --baseline newly-available <files>
+```
 
 For more information about Baseline browser support, visit [web.dev/baseline][baseline].
 
@@ -140,6 +146,16 @@ Rules inside `@media`, `@supports`, `@container`, `@layer`, `@scope`, and `@star
 -.card .title, .card .body { color: red; }
 +.card :is(.title, .body) { color: red; }
 ```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://web-platform-dx.github.io/assets/img/baseline-newly-word-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://web-platform-dx.github.io/assets/img/baseline-newly-word.svg">
+  <img alt="Baseline: Newly available" src="https://web-platform-dx.github.io/assets/img/baseline-newly-word.svg" height="32" align="right">
+</picture>
+
+### Newly available
+
+No transformations are available yet.
 
 ## Versioning
 

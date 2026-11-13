@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
+import * as newlyAvailable from "../src/newlyAvailable.js"
 import { matchesPrefilter, prefilters } from "../src/prefilters.js"
 import * as widelyAvailable from "../src/widelyAvailable.js"
 
@@ -28,7 +29,7 @@ describe("prefilters", () => {
   })
 
   test("declare a pre-filter for every transformer", () => {
-    const names = Object.keys(widelyAvailable)
+    const names = [...Object.keys(widelyAvailable), ...Object.keys(newlyAvailable)]
 
     assert.deepEqual(
       names.filter((name) => !prefilters.has(name)),

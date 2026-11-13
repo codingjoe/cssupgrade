@@ -52,6 +52,7 @@ describe("TransformWorker", () => {
 
     const message = await worker.transform({
       filePath,
+      baseline: "widely-available",
       includeOriginal: true,
     })
     await worker.terminate()
@@ -73,6 +74,7 @@ describe("TransformWorker", () => {
 
     const message = await worker.transform({
       filePath,
+      baseline: "widely-available",
       includeOriginal: false,
     })
     await worker.terminate()
@@ -91,6 +93,7 @@ describe("TransformWorker", () => {
 
     const message = await worker.transform({
       filePath: path.join(tempDir, "missing.css"),
+      baseline: "widely-available",
       includeOriginal: true,
     })
     await worker.terminate()
@@ -107,6 +110,7 @@ describe("TransformWorker", () => {
 
     const message = await worker.transform({
       filePath,
+      baseline: "widely-available",
       includeOriginal: false,
     })
     await worker.terminate()
@@ -125,6 +129,7 @@ describe("TransformWorker", () => {
     const worker = new TransformWorker(SILENT_WORKER_PATH)
     const pending = worker.transform({
       filePath: "unused.css",
+      baseline: "widely-available",
       includeOriginal: false,
     })
 
@@ -141,12 +146,14 @@ describe("TransformWorker", () => {
     const worker = new TransformWorker(SILENT_WORKER_PATH)
     const inFlight = worker.transform({
       filePath: "unused.css",
+      baseline: "widely-available",
       includeOriginal: false,
     })
 
     await assert.rejects(
       worker.transform({
         filePath: "unused.css",
+        baseline: "widely-available",
         includeOriginal: false,
       }),
       { message: "Worker already transformed a file" },
@@ -164,6 +171,7 @@ describe("TransformWorker", () => {
     await assert.rejects(
       worker.transform({
         filePath: "unused.css",
+        baseline: "widely-available",
         includeOriginal: false,
       }),
       { name: "Error", message: /^Worker stopped with exit code \d+$/ },
@@ -177,6 +185,7 @@ describe("TransformWorker", () => {
     await assert.rejects(
       worker.transform({
         filePath: "unused.css",
+        baseline: "widely-available",
         includeOriginal: false,
       }),
       { code: "MODULE_NOT_FOUND" },
