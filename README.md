@@ -140,6 +140,13 @@ Rules inside `@media`, `@supports`, `@container`, `@layer`, `@scope`, and `@star
 }
 ```
 
+#### Selector lists → [:is()][mdn-is]
+
+```diff
+-.card .title, .card .body { color: red; }
++.card :is(.title, .body) { color: red; }
+```
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://web-platform-dx.github.io/assets/img/baseline-newly-word-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="https://web-platform-dx.github.io/assets/img/baseline-newly-word.svg">
@@ -170,5 +177,6 @@ CSSupgrade applies the same Baseline policy to CSS.
 [claude code]: https://code.claude.com
 [esupgrade]: https://github.com/codingjoe/esupgrade
 [husky]: https://typicode.github.io/husky/
+[mdn-is]: https://developer.mozilla.org/en-US/docs/Web/CSS/:is
 [mdn-nesting]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_nesting
 [pre-commit]: https://pre-commit.com/

@@ -13,6 +13,21 @@ describe("prefilters", () => {
     assert.equal(matchesPrefilter("cssNesting", ".a { color: red }"), false)
   })
 
+  test("accept CSS with a selector list", () => {
+    assert.equal(
+      matchesPrefilter("isGrouping", ".card .title, .card .body { color: red }"),
+      true,
+    )
+  })
+
+  test("reject CSS without a comma", () => {
+    assert.equal(matchesPrefilter("isGrouping", ".card .title { color: red }"), false)
+  })
+
+  test("reject CSS with commas only after a block", () => {
+    assert.equal(matchesPrefilter("isGrouping", ".card { color: rgb(0, 0, 0) }"), false)
+  })
+
   test("declare a pre-filter for every transformer", () => {
     const names = [...Object.keys(widelyAvailable), ...Object.keys(newlyAvailable)]
 

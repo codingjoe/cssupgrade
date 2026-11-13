@@ -17,6 +17,28 @@ import * as widelyAvailable from "./widelyAvailable.js"
  */
 
 /**
+ * Apply one transformer to the result of the previous transformers.
+ *
+ * @param {TransformResult} result - Current transformation result.
+ * @param {NamedTransformer} namedTransformer - Transformer name and function.
+ * @returns {TransformResult} Updated transformation result.
+ */
+function applyNamedTransformer(result, [name, transformer]) {
+  switch (matchesPrefilter(name, result.code)) {
+    case false:
+      return result
+    default: {
+      const transformed = transformer(result.code)
+
+      return {
+        code: transformed.code,
+        modified: result.modified || transformed.modified,
+      }
+    }
+  }
+}
+
+/**
  * Apply every transformer that passes its pre-filter, then repeat on the result.
  *
  * @param {string} code - CSS source text.
@@ -25,11 +47,10 @@ import * as widelyAvailable from "./widelyAvailable.js"
  * @returns {TransformResult} Transformed source.
  */
 function applyTransformersRecursively(code, transformers, globalModified = false) {
-  const passResult = transformers.reduce(
-    (result, [name, transformer]) =>
-      matchesPrefilter(name, result.code) ? transformer(result.code) : result,
-    { code, modified: false },
-  )
+  const passResult = transformers.reduce(applyNamedTransformer, {
+    code,
+    modified: false,
+  })
 
   return passResult.modified
     ? applyTransformersRecursively(passResult.code, transformers, true)

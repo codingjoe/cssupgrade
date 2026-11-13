@@ -17,6 +17,8 @@
 export const prefilters = new Map([
   // Nesting needs two rules, so the source holds at least two blocks.
   ["cssNesting", [/\{[\s\S]*\{/]],
+  // Selector lists need a comma before a block.
+  ["isGrouping", [/,[\s\S]*\{/]],
 ])
 
 /**
