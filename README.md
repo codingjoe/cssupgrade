@@ -172,6 +172,11 @@ Thanks to [esupgrade] for inspiring CSSupgrade.
 [esupgrade] upgrades JavaScript and TypeScript syntax.
 CSSupgrade applies the same Baseline policy to CSS.
 
+## License
+
+CSSupgrade is licensed under the [GNU Affero General Public License v3.0 or later](https://www.gnu.org/licenses/agpl-3.0.html), with Johannes Maron as copyright holder.
+See [LICENSE](./LICENSE) for the full license text.
+
 [baseline]: https://web.dev/baseline/
 [calver]: https://calver.org/
 [claude code]: https://code.claude.com
