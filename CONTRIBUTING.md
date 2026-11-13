@@ -4,8 +4,13 @@ To run tests locally, follow these steps:
 
 ```console
 npm ci
+npx playwright install
 npm test
 ```
+
+The browser tests render every fixture with the original and transformed CSS and
+compare the computed styles of all elements in Chromium, Firefox, and WebKit.
+Register fixtures in the test file of the transformer they cover.
 
 We use pre-commit hooks to lint and format code before committing.
 

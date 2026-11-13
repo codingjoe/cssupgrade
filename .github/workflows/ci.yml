@@ -29,6 +29,7 @@ jobs:
         with:
           node-version-file: package.json
       - run: npm ci
+      - run: npx playwright install --with-deps
       - run: npm test
       - uses: codecov/codecov-action@v7
         with:

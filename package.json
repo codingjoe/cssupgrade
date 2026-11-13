@@ -32,5 +32,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/codingjoe/cssupgrade.git"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0"
   }
 }
