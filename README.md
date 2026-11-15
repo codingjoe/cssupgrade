@@ -119,18 +119,27 @@ Rules that cannot nest keep their original text.
 #### Flat rules → [CSS nesting][mdn-nesting]
 
 ```diff
- .card {
-   padding: 1rem;
+-.card {
+-  padding: 1rem;
 -}
 -.card .title { font-weight: bold; }
 -.card:hover { color: red; }
++.card {
++  padding: 1rem;
 +  .title { font-weight: bold; }
 +  &:hover { color: red; }
++}
+
+-input[type="text"] { color: black; }
+-input[type="email"] { color: gray; }
++input {
++  &[type="text"] { color: black; }
++  &[type="email"] { color: gray; }
 +}
 ```
 
 Only adjacent rules are nested, so the cascade order stays the same.
-Every child selector must repeat a parent selector, and all parent selectors must have the same specificity.
+Every child selector must repeat a parent selector or a shared selector prefix, and all parent selectors must have the same specificity.
 Rules inside `@media`, `@supports`, `@container`, `@layer`, `@scope`, and `@starting-style` blocks are nested as well.
 
 ```css

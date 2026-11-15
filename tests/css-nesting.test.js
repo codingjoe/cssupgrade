@@ -516,6 +516,369 @@ describe("cssNesting", () => {
   testComputedStyles(cssNestingFixtures)
 })
 
+describe("cssNesting shared selector prefixes", () => {
+  test("nest attribute variants under their shared prefix", () => {
+    assertTransform(
+      `input[type="text"] {
+  color: black;
+}
+input[type="email"] {
+  color: gray;
+}`,
+      `input {
+  &[type="text"] {
+    color: black;
+  }
+  &[type="email"] {
+    color: gray;
+  }
+}`,
+    )
+  })
+
+  test("nest rules with a shared descendant prefix", () => {
+    assertTransform(
+      `.card .title {
+  color: red;
+}
+.card .body {
+  color: blue;
+}`,
+      `.card {
+  .title {
+    color: red;
+  }
+  .body {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest rules with a shared child combinator prefix", () => {
+    assertTransform(
+      `.card > .title {
+  color: red;
+}
+.card > .body {
+  color: blue;
+}`,
+      `.card {
+  & > .title {
+    color: red;
+  }
+  & > .body {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest rules with a shared pseudo-class prefix", () => {
+    assertTransform(
+      `.button:hover {
+  color: red;
+}
+.button:focus {
+  color: blue;
+}`,
+      `.button {
+  &:hover {
+    color: red;
+  }
+  &:focus {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("preserve comments around shared-prefix rules", () => {
+    assertTransform(
+      `/* before */
+.a .b {
+  color: red;
+}
+/* between */
+.a .c {
+  color: blue;
+}
+/* after */
+.b {
+  color: green;
+}`,
+      `/* before */
+.a {
+  .b {
+    color: red;
+  }
+  /* between */
+  .c {
+    color: blue;
+  }
+}
+/* after */
+.b {
+  color: green;
+}`,
+    )
+  })
+
+  test("preserve the order of a later base rule", () => {
+    assertTransform(
+      `.a .b {
+  color: red;
+}
+.a .c {
+  color: blue;
+}
+.a {
+  color: green;
+}`,
+      `.a {
+  .b {
+    color: red;
+  }
+  .c {
+    color: blue;
+  }
+}
+.a {
+  color: green;
+}`,
+    )
+  })
+
+  test("preserve the order of an intervening base rule", () => {
+    assertTransform(
+      `.a .x {
+  color: red;
+}
+.a {
+  color: green;
+}
+.a .y {
+  color: blue;
+}`,
+      `.a .x {
+  color: red;
+}
+.a {
+  color: green;
+  .y {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest selector lists under a shared prefix", () => {
+    assertTransform(
+      `.a .x, .a .y {
+  color: red;
+}
+.a .z, .a .w {
+  color: blue;
+}`,
+      `.a {
+  .x, .y {
+    color: red;
+  }
+  .z, .w {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest under a functional pseudo-class prefix", () => {
+    assertTransform(
+      `:is(.a, .b) .x {
+  color: red;
+}
+:is(.a, .b) .y {
+  color: blue;
+}`,
+      `:is(.a, .b) {
+  .x {
+    color: red;
+  }
+  .y {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest shared-prefix rules in an at-rule block", () => {
+    assertTransform(
+      `@media (min-width: 600px) {
+  .a .x {
+    color: red;
+  }
+  .a .y {
+    color: blue;
+  }
+}`,
+      `@media (min-width: 600px) {
+  .a {
+    .x {
+      color: red;
+    }
+    .y {
+      color: blue;
+    }
+  }
+}`,
+    )
+  })
+
+  test("nest a chain below a shared prefix", () => {
+    assertTransform(
+      `.a .b {
+  color: red;
+}
+.a .c {
+  color: blue;
+}
+.a .c .d {
+  color: green;
+}`,
+      `.a {
+  .b {
+    color: red;
+  }
+  .c {
+    color: blue;
+    .d {
+      color: green;
+    }
+  }
+}`,
+    )
+  })
+
+  test("nest independent shared-prefix groups", () => {
+    assertTransform(
+      `.a .x {
+  color: red;
+}
+.a .y {
+  color: blue;
+}
+.b .x {
+  color: green;
+}
+.b .y {
+  color: black;
+}`,
+      `.a {
+  .x {
+    color: red;
+  }
+  .y {
+    color: blue;
+  }
+}
+.b {
+  .x {
+    color: green;
+  }
+  .y {
+    color: black;
+  }
+}`,
+    )
+  })
+
+  test("nest shared-prefix rules with an escaped space", () => {
+    assertTransform(
+      String.raw`.a\  .x {
+  color: red;
+}
+.a\  .y {
+  color: blue;
+}`,
+      String.raw`.a\  {
+  .x {
+    color: red;
+  }
+  .y {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("nest shared-prefix rules with different suffix specificity", () => {
+    assertTransform(
+      `.a#b {
+  color: red;
+}
+.a .c {
+  color: blue;
+}`,
+      `.a {
+  &#b {
+    color: red;
+  }
+  .c {
+    color: blue;
+  }
+}`,
+    )
+  })
+
+  test("preserve CRLF line endings for shared-prefix rules", () => {
+    assertTransform(
+      ".a .x {\r\n  color: red;\r\n}\r\n.a .y {\r\n  color: blue;\r\n}\r\n",
+      ".a {\r\n  .x {\r\n    color: red;\r\n  }\r\n  .y {\r\n    color: blue;\r\n  }\r\n}\r\n",
+    )
+  })
+
+  test("leave rules without a shared selector prefix unchanged", () => {
+    const input = `.a .b { color: red; }
+.c .d { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave selector lists without a shared selector prefix unchanged", () => {
+    const input = `.a .b, .c .d { color: red; }
+.a .e, .c .f { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave a shared-prefix first rule with a comment in its prelude unchanged", () => {
+    const input = `.a /* keep */ .x { color: red; }
+.a .y { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave a shared-prefix next rule with a comment in its prelude unchanged", () => {
+    const input = `.a .x { color: red; }
+.a /* keep */ .y { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave a shared pseudo-element prefix unchanged", () => {
+    const input = `.a::before .b { color: red; }
+.a::before .c { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+
+  test("leave a shared unknown pseudo-class prefix unchanged", () => {
+    const input = `.a:foo(.b) .c { color: red; }
+.a:foo(.b) .d { color: blue; }`
+
+    assert.equal(transform(input).modified, false)
+  })
+})
+
 describe("cssNesting edge cases", () => {
   test("leave a rule with an empty selector list argument unchanged", () => {
     const input = `.a:is() { color: red; }
