@@ -97,6 +97,37 @@ export const cssNestingFixtures = [
       }`,
   },
   {
+    name: "nest rules with a shared selector prefix",
+    html: `
+      <input type="text">
+      <input type="email">
+      <input type="search">`,
+    css: `
+      input[type="text"] { color: black; }
+      input[type="email"] { color: gray; }
+      input[type="search"] { color: rebeccapurple; }`,
+  },
+  {
+    name: "nest rules with a zero-specificity prefix",
+    html: `
+      <div class="alpha"><span class="target">A</span><span class="other">B</span></div>
+      <div class="beta"><span class="target">C</span><span class="other">D</span></div>`,
+    css: `
+      :where(.alpha, .beta) .target { color: red; }
+      :where(.alpha, .beta) .other { color: blue; }
+      .target { color: green; }`,
+  },
+  {
+    name: "nest rules with a shared combinator prefix",
+    html: `
+      <div class="card"><span class="title">A</span><span class="body">B</span></div>
+      <div class="card"><span class="title">C</span><span class="body">D</span></div>`,
+    css: `
+      .card > .title { color: red; }
+      .card > .body { color: blue; }
+      .card + .card { opacity: 0.5; }`,
+  },
+  {
     name: "nest interactive states",
     html: `<button class="button"><span class="label">A</span></button>`,
     hover: [".button"],

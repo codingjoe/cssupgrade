@@ -1,7 +1,11 @@
 import { generate } from "css-tree"
 import { styleRuleAtRules } from "../atRules.js"
 import { isEqualSelectorNode, parseCss } from "../parser.js"
-import { calculateSpecificity, isEqualSpecificity } from "../specificity.js"
+import {
+  calculateNodesSpecificity,
+  calculateSpecificity,
+  isEqualSpecificity,
+} from "../specificity.js"
 
 /** @typedef {import("../index.js").TransformResult} TransformResult */
 
@@ -27,6 +31,16 @@ function isPlainRule(rule) {
 }
 
 /**
+ * Check whether selector nodes contain a pseudo-element.
+ *
+ * @param {Iterable<import("css-tree").CssNode>} nodes - Selector nodes.
+ * @returns {boolean} True when a node is a pseudo-element.
+ */
+function hasPseudoElementNodes(nodes) {
+  return [...nodes].some((node) => node.type === "PseudoElementSelector")
+}
+
+/**
  * Check whether a rule selects a pseudo-element.
  *
  * @param {import("css-tree").CssNode} rule - Style rule.
@@ -34,7 +48,7 @@ function isPlainRule(rule) {
  */
 function hasPseudoElement(rule) {
   return [...rule.prelude.children].some((selector) =>
-    [...selector.children].some((node) => node.type === "PseudoElementSelector"),
+    hasPseudoElementNodes(selector.children),
   )
 }
 
@@ -115,15 +129,14 @@ function describeSelectorRemainder(code, childSelector, childNodes, index) {
 }
 
 /**
- * Match a parent selector against the start of a child selector.
+ * Match parent selector nodes against the start of a child selector.
  *
  * @param {string} code - CSS source text.
- * @param {import("css-tree").CssNode} parentSelector - Parent selector.
+ * @param {import("css-tree").CssNode[]} parentNodes - Parent selector nodes.
  * @param {import("css-tree").CssNode} childSelector - Child selector.
  * @returns {{kind: string, text: string} | null} Remainder, or null without a match.
  */
-function matchSelectorPrefix(code, parentSelector, childSelector) {
-  const parentNodes = [...parentSelector.children]
+function matchSelectorPrefix(code, parentNodes, childSelector) {
   const childNodes = [...childSelector.children]
 
   switch (true) {
@@ -207,30 +220,25 @@ function trimDeclarationText(text) {
  * Build the nested selector list that replaces a child selector list.
  *
  * @param {string} code - CSS source text.
- * @param {import("css-tree").CssNode} parent - Parent style rule.
+ * @param {import("css-tree").CssNode[]} parentSelectors - Parent selectors.
  * @param {import("css-tree").CssNode} child - Child style rule.
  * @param {SourceRange[]} comments - Comment ranges.
  * @returns {string | null} Nested selector list, or null when the rules cannot nest.
  */
-function findNestedPrelude(code, parent, child, comments) {
+function findNestedPreludeForSelectors(code, parentSelectors, child, comments) {
   switch (true) {
-    case hasCommentOutsideBlock(comments, parent):
-      return null
     case hasCommentOutsideBlock(comments, child):
       return null
-    case hasPseudoElement(parent):
+    case new Set(parentSelectors.map((selector) => generate(selector))).size !==
+      parentSelectors.length:
       return null
     default:
       break
   }
 
-  const parentSelectors = [...parent.prelude.children]
   const childSelectors = [...child.prelude.children]
 
   switch (true) {
-    case new Set(parentSelectors.map((selector) => generate(selector))).size !==
-      parentSelectors.length:
-      return null
     case new Set(childSelectors.map((selector) => generate(selector))).size !==
       childSelectors.length:
       return null
@@ -238,7 +246,7 @@ function findNestedPrelude(code, parent, child, comments) {
       break
   }
 
-  const parentSpecificities = Array.from(parent.prelude.children, calculateSpecificity)
+  const parentSpecificities = parentSelectors.map(calculateSpecificity)
 
   switch (true) {
     case parentSpecificities.some((specificity) => specificity === null):
@@ -255,7 +263,7 @@ function findNestedPrelude(code, parent, child, comments) {
     parents: parentSelectors
       .map((parentSelector) => ({
         parentSelector,
-        remainder: matchSelectorPrefix(code, parentSelector, selector),
+        remainder: matchSelectorPrefix(code, [...parentSelector.children], selector),
       }))
       .filter(({ remainder }) => remainder !== null),
   }))
@@ -288,10 +296,145 @@ function findNestedPrelude(code, parent, child, comments) {
 }
 
 /**
+ * Build the nested selector list that replaces a child of a style rule.
+ *
+ * @param {string} code - CSS source text.
+ * @param {import("css-tree").CssNode} parent - Parent style rule.
+ * @param {import("css-tree").CssNode} child - Child style rule.
+ * @param {SourceRange[]} comments - Comment ranges.
+ * @returns {string | null} Nested selector list, or null when the rules cannot nest.
+ */
+function findNestedPrelude(code, parent, child, comments) {
+  switch (true) {
+    case hasCommentOutsideBlock(comments, parent):
+      return null
+    case hasPseudoElement(parent):
+      return null
+    default:
+      return findNestedPreludeForSelectors(
+        code,
+        [...parent.prelude.children],
+        child,
+        comments,
+      )
+  }
+}
+
+/**
+ * Count the leading nodes that two selectors share.
+ *
+ * @param {import("css-tree").CssNode} left - First selector.
+ * @param {import("css-tree").CssNode} right - Second selector.
+ * @returns {number} Number of equal leading nodes.
+ */
+function countCommonPrefixNodes(left, right) {
+  const leftNodes = [...left.children]
+  const rightNodes = [...right.children]
+  const mismatch = leftNodes.findIndex(
+    (node, index) =>
+      rightNodes[index] === undefined || !isEqualSelectorNode(node, rightNodes[index]),
+  )
+
+  switch (mismatch) {
+    case -1:
+      return Math.min(leftNodes.length, rightNodes.length)
+    default:
+      return mismatch
+  }
+}
+
+/**
+ * Drop trailing combinators from selector nodes.
+ *
+ * @param {import("css-tree").CssNode[]} nodes - Selector nodes.
+ * @returns {import("css-tree").CssNode[]} Nodes without a trailing combinator.
+ */
+function trimTrailingCombinators(nodes) {
+  switch (nodes.at(-1)?.type) {
+    case "Combinator":
+      return trimTrailingCombinators(nodes.slice(0, -1))
+    default:
+      return nodes
+  }
+}
+
+/**
+ * Find the smallest common prefix length between two selector lists.
+ *
+ * @param {import("css-tree").CssNode[]} leftSelectors - Selectors of the first rule.
+ * @param {import("css-tree").CssNode[]} rightSelectors - Selectors of the second rule.
+ * @returns {number} Smallest common prefix length.
+ */
+function findSmallestCommonPrefixLength(leftSelectors, rightSelectors) {
+  return leftSelectors
+    .flatMap((left) =>
+      rightSelectors.map((right) => countCommonPrefixNodes(left, right)),
+    )
+    .reduce((smallest, length) => Math.min(smallest, length), Infinity)
+}
+
+/**
+ * Find the selector prefix shared by two style rules.
+ *
+ * @param {import("css-tree").CssNode} first - First style rule.
+ * @param {import("css-tree").CssNode | undefined} second - Second style rule.
+ * @returns {import("css-tree").CssNode[] | null} Shared nodes, or null without a prefix.
+ */
+function findSharedPrefixNodes(first, second) {
+  switch (true) {
+    case second === undefined:
+      return null
+    case !isPlainRule(second):
+      return null
+    default:
+      break
+  }
+
+  const firstSelectors = [...first.prelude.children]
+  const secondSelectors = [...second.prelude.children]
+  const length = findSmallestCommonPrefixLength(firstSelectors, secondSelectors)
+  const nodes = trimTrailingCombinators(
+    [...firstSelectors[0].children].slice(0, length),
+  )
+  const selectors = [...firstSelectors, ...secondSelectors]
+
+  switch (true) {
+    case nodes.length === 0:
+      return null
+    case selectors.some((selector) => selector.children.size <= nodes.length):
+      return null
+    case hasPseudoElementNodes(nodes):
+      return null
+    case calculateNodesSpecificity(nodes) === null:
+      return null
+    default:
+      return nodes
+  }
+}
+
+/**
+ * Create a selector node from shared selector nodes.
+ *
+ * @param {import("css-tree").CssNode[]} nodes - Shared selector nodes.
+ * @returns {import("css-tree").CssNode} Selector node.
+ */
+function createPrefixSelector(nodes) {
+  return {
+    type: "Selector",
+    loc: {
+      start: nodes[0].loc.start,
+      end: nodes.at(-1).loc.end,
+    },
+    children: nodes,
+  }
+}
+
+/**
  * Rewrites flat stylesheets to use CSS nesting.
  *
- * Only adjacent rules are nested, so the cascade order stays the same. Rules
- * without a nested child keep their original text.
+ * Only adjacent rules are nested, so the cascade order stays the same. Adjacent
+ * rules that share a selector prefix nest under that prefix. Rules without a
+ * nested child keep their original text.
  */
 class NestingModernizer {
   #ast
@@ -314,7 +457,7 @@ class NestingModernizer {
   }
 
   /**
-   * Nest adjacent rules that extend the selector of an earlier rule.
+   * Nest adjacent rules that share a selector prefix.
    *
    * @returns {string} Transformed CSS source.
    */
@@ -356,11 +499,10 @@ class NestingModernizer {
    * @returns {Array<{kind: string, node?: import("css-tree").CssNode, group?: Object}>} Items to render.
    */
   #groupChildren(children) {
-    return children.reduce((state, child) => this.#groupChild(state, child), {
-      items: [],
-      stack: [],
-      lastRuleEnd: null,
-    }).items
+    return children.reduce(
+      (state, child, index) => this.#groupChild(state, child, children[index + 1]),
+      { items: [], stack: [], lastRuleEnd: null },
+    ).items
   }
 
   /**
@@ -368,39 +510,72 @@ class NestingModernizer {
    *
    * @param {Object} state - Grouping state.
    * @param {import("css-tree").CssNode} child - Child node.
+   * @param {import("css-tree").CssNode} [next] - Next sibling node.
    * @returns {Object} Updated grouping state.
    */
-  #groupChild(state, child) {
+  #groupChild(state, child, next) {
     const match = this.#findMatch(state, child)
 
     switch (true) {
-      case match !== null: {
-        const group = {
-          node: child,
-          prelude: match.prelude,
-          children: [],
-          leadingComments: this.#commentsBetween(
-            state.lastRuleEnd,
-            child.loc.start.offset,
-          ),
-        }
-
-        match.group.children.push(group)
-
-        return {
-          items: state.items,
-          stack: [...state.stack.slice(0, match.stackLength), group],
-          lastRuleEnd: child.loc.end.offset,
-        }
-      }
+      case match !== null:
+        return this.#addMatch(state, child, match)
       default:
         break
     }
 
     switch (isPlainRule(child)) {
-      case true: {
+      case true:
+        return this.#startGroup(state, child, next)
+      default:
+        return {
+          items: [...state.items, { kind: "node", node: child }],
+          stack: [],
+          lastRuleEnd: null,
+        }
+    }
+  }
+
+  /**
+   * Add a rule to its matching group.
+   *
+   * @param {Object} state - Grouping state.
+   * @param {import("css-tree").CssNode} child - Child node.
+   * @param {{group: Object, prelude: string, stackLength: number}} match - Matching group.
+   * @returns {Object} Updated grouping state.
+   */
+  #addMatch(state, child, match) {
+    const group = {
+      node: child,
+      prelude: match.prelude,
+      children: [],
+      leadingComments: this.#commentsBetween(state.lastRuleEnd, child.loc.start.offset),
+    }
+
+    match.group.children.push(group)
+
+    return {
+      items: state.items,
+      stack: [...state.stack.slice(0, match.stackLength), group],
+      lastRuleEnd: child.loc.end.offset,
+    }
+  }
+
+  /**
+   * Start a group from a rule or from a selector prefix shared with the next rule.
+   *
+   * @param {Object} state - Grouping state.
+   * @param {import("css-tree").CssNode} child - Style rule.
+   * @param {import("css-tree").CssNode} [next] - Next sibling node.
+   * @returns {Object} Updated grouping state.
+   */
+  #startGroup(state, child, next) {
+    const prefix = this.#findPrefixGroup(child, next)
+
+    switch (prefix) {
+      case null: {
         const group = {
           node: child,
+          start: child.loc.start.offset,
           prelude: this.#code.slice(
             child.prelude.loc.start.offset,
             child.prelude.loc.end.offset,
@@ -415,12 +590,75 @@ class NestingModernizer {
           lastRuleEnd: child.loc.end.offset,
         }
       }
-      default:
-        return {
-          items: [...state.items, { kind: "node", node: child }],
-          stack: [],
-          lastRuleEnd: null,
+      default: {
+        const group = {
+          node: null,
+          selector: prefix.selector,
+          start: child.loc.start.offset,
+          prelude: prefix.prelude,
+          children: [
+            {
+              node: child,
+              prelude: prefix.firstPrelude,
+              children: [],
+              leadingComments: [],
+            },
+          ],
+          leadingComments: [],
         }
+
+        return {
+          items: [...state.items, { kind: "group", group }],
+          stack: [group],
+          lastRuleEnd: child.loc.end.offset,
+        }
+      }
+    }
+  }
+
+  /**
+   * Find a selector prefix that a rule shares with the next rule.
+   *
+   * @param {import("css-tree").CssNode} child - Style rule.
+   * @param {import("css-tree").CssNode} [next] - Next sibling node.
+   * @returns {{selector: import("css-tree").CssNode, prelude: string, firstPrelude: string} | null} Prefix group data.
+   */
+  #findPrefixGroup(child, next) {
+    const nodes = findSharedPrefixNodes(child, next)
+
+    switch (nodes) {
+      case null:
+        return null
+      default: {
+        const selector = createPrefixSelector(nodes)
+        const firstPrelude = findNestedPreludeForSelectors(
+          this.#code,
+          [selector],
+          child,
+          this.#comments,
+        )
+        const nextPrelude = findNestedPreludeForSelectors(
+          this.#code,
+          [selector],
+          next,
+          this.#comments,
+        )
+
+        switch (true) {
+          case firstPrelude === null:
+          case nextPrelude === null:
+            return null
+          default:
+            return {
+              selector,
+              firstPrelude,
+              prelude: this.#code.slice(
+                nodes[0].loc.start.offset,
+                nodes.at(-1).loc.end.offset,
+              ),
+            }
+        }
+      }
     }
   }
 
@@ -441,9 +679,7 @@ class NestingModernizer {
         break
     }
 
-    const preludes = state.stack.map((group) =>
-      findNestedPrelude(this.#code, group.node, child, this.#comments),
-    )
+    const preludes = state.stack.map((group) => this.#findGroupPrelude(group, child))
     const index = preludes.findLastIndex((prelude) => prelude !== null)
 
     switch (index) {
@@ -459,6 +695,27 @@ class NestingModernizer {
   }
 
   /**
+   * Find the nested prelude of a child rule for a group.
+   *
+   * @param {Object} group - Group candidate.
+   * @param {import("css-tree").CssNode} child - Child style rule.
+   * @returns {string | null} Nested prelude, or null when the rule does not fit.
+   */
+  #findGroupPrelude(group, child) {
+    switch (group.node) {
+      case null:
+        return findNestedPreludeForSelectors(
+          this.#code,
+          [group.selector],
+          child,
+          this.#comments,
+        )
+      default:
+        return findNestedPrelude(this.#code, group.node, child, this.#comments)
+    }
+  }
+
+  /**
    * Read the source range a grouped item replaces.
    *
    * @param {Object} item - Group or untouched node.
@@ -468,7 +725,7 @@ class NestingModernizer {
     switch (item.kind) {
       case "group":
         return {
-          start: item.group.node.loc.start.offset,
+          start: item.group.start,
           end: findGroupEnd(item.group),
         }
       default:
@@ -516,7 +773,7 @@ class NestingModernizer {
    * @returns {string} Rendered rule.
    */
   #renderGroup(group) {
-    const baseIndent = this.#lineIndent(group.node.loc.start.offset)
+    const baseIndent = this.#lineIndent(group.start)
     const rendered = this.#renderRule(group, baseIndent)
 
     return rendered.slice(baseIndent.length)
@@ -534,7 +791,7 @@ class NestingModernizer {
 
     return [
       `${indent}${group.prelude} {`,
-      ...this.#renderBlockEntries(group.node.block, childIndent),
+      ...this.#renderGroupEntries(group, childIndent),
       ...group.children.flatMap((child) => [
         ...child.leadingComments.map(
           (comment) => `${childIndent}${this.#commentText(comment)}`,
@@ -543,6 +800,22 @@ class NestingModernizer {
       ]),
       `${indent}}`,
     ].join(this.#lineEnding)
+  }
+
+  /**
+   * Render the declarations of a group.
+   *
+   * @param {Object} group - Group to render.
+   * @param {string} indent - Indentation of the entries.
+   * @returns {string[]} Rendered entries.
+   */
+  #renderGroupEntries(group, indent) {
+    switch (group.node) {
+      case null:
+        return []
+      default:
+        return this.#renderBlockEntries(group.node.block, indent)
+    }
   }
 
   /**
@@ -727,7 +1000,7 @@ function findGroupEnd(group) {
 }
 
 /**
- * Nest adjacent rules that extend the selector of an earlier rule.
+ * Nest adjacent rules that share a selector prefix.
  *
  * @param {string} code - CSS source text.
  * @returns {TransformResult} Nested CSS.
